@@ -2,3 +2,5 @@ Adeleke Oluwafeyisikemi Nancy
 22CG031807
 Random Forest Classifier
 Joblib
+https://github.com/dev-feyi/titanic_project.git
+https://titanic-project-2.onrender.com

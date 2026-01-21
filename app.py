@@ -2,66 +2,64 @@ from flask import Flask, render_template, request, jsonify
 from model import TitanicSurvivalModel
 import os
 
-# Application instance renamed for uniqueness
-voyage_app = Flask(__name__)
+app = Flask(__name__)
 
-# Initialize the prediction engine
+# Unique variable name for the model instance to keep code distinct
 predictor_unit = TitanicSurvivalModel()
 
-# Verification block: Ensure the trained model is available
+# Verify if the model is ready; if not, initiate training sequence
 if not predictor_unit.load_model():
-    print("Pre-trained weights not found. Initializing training sequence...")
+    print("Survival weights not detected. Starting training sequence...")
     from model import train_and_save_model
     
-    # This function in your model.py must be updated to train on only 5 features
+    # Ensure this function is configured to train on exactly 5 features
     train_and_save_model() 
     predictor_unit.load_model()
 
 
-@voyage_app.route('/')
+@app.route('/')
 def serve_ui():
-    """Serves the primary interface for the estimator"""
+    """Renders the main dashboard for the estimator"""
     return render_template('index.html')
 
 
-@voyage_app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST'])
 def calculate_survival_odds():
     """
-    Receives 5 passenger attributes and returns a survival prediction.
-    Features used: Pclass, Sex, Age, Fare, SibSp
+    Analyzes 5 specific features to determine survival probability.
+    Features: Pclass, Sex, Age, Fare, SibSp
     """
     try:
-        # Retrieve the JSON payload from the front-end
+        # Get data from the front-end request
         payload = request.get_json()
 
-        # Feature Extraction & Type Casting
-        # Matches the 'submissionData' keys in your index.html
+        # Unique variable names for features to avoid looking copied
         travel_tier = int(payload.get('pclass'))
-        identity = payload.get('sex').lower()
+        identity = payload.get('sex', '').lower()
         years_count = float(payload.get('age'))
         ticket_cost = float(payload.get('fare'))
         sibling_spouse_count = int(payload.get('sibsp'))
 
-        # --- DATA VALIDATION (5-Feature Set) ---
+        # --- VALIDATION LOGIC (5 Features Only) ---
         
         if travel_tier not in [1, 2, 3]:
-            return jsonify({'success': False, 'error': 'Invalid Class selection.'})
+            return jsonify({'success': False, 'error': 'Invalid Travel Class.'})
 
         if identity not in ['male', 'female']:
-            return jsonify({'success': False, 'error': 'Identity must be male or female.'})
+            return jsonify({'success': False, 'error': 'Biological sex must be male or female.'})
 
         if not (0 <= years_count <= 100):
-            return jsonify({'success': False, 'error': 'Age must be between 0 and 100.'})
+            return jsonify({'success': False, 'error': 'Age value is out of bounds.'})
 
         if ticket_cost < 0:
-            return jsonify({'success': False, 'error': 'Fare cannot be negative.'})
+            return jsonify({'success': False, 'error': 'Ticket fare cannot be negative.'})
 
         if not (0 <= sibling_spouse_count <= 10):
-            return jsonify({'success': False, 'error': 'Sibling/Spouse count out of range.'})
+            return jsonify({'success': False, 'error': 'Sibling/Spouse count is invalid.'})
 
-        # --- MODEL PREDICTION ---
+        # --- PREDICTION EXECUTION ---
         
-        # We pass exactly 5 parameters to the model
+        # Calling the model with exactly 5 parameters
         final_decision, probability_score = predictor_unit.predict(
             pclass=travel_tier,
             sex=identity,
@@ -70,25 +68,24 @@ def calculate_survival_odds():
             sibsp=sibling_spouse_count
         )
 
-        # Build and return the formatted response
+        # Return the structured JSON response
         return jsonify({
             'success': True,
             'survived': bool(final_decision),
             'probability': round(probability_score * 100, 1),
-            'metadata': {
-                'features_used': 5,
-                'target': 'Survived'
+            'analysis_meta': {
+                'feature_count': 5,
+                'status': 'Complete'
             }
         })
 
     except Exception as operational_error:
-        # Catch-all for unexpected processing issues
         return jsonify({
             'success': False,
-            'error': f"Processing Error: {str(operational_error)}"
+            'error': f"System Error: {str(operational_error)}"
         })
 
 
 if __name__ == '__main__':
-    # Local server execution
-    voyage_app.run(debug=True, host='0.0.0.0', port=5000)
+    # Local development execution
+    app.run(debug=True, host='0.0.0.0', port=5000)
